@@ -23,6 +23,7 @@ import AdminChat from './pages/AdminChat';
 import GenerateID from './pages/admin/GenerateID';
 import VerifyID from './pages/public/VerifyID';
 import AllIDs from './pages/admin/AllIDs';
+import Profile from './pages/Profile';
 import { RoutePath } from './types';
 import ProtectedRoute from './components/ProtectedRoute';
 import SimpleAuthRoute from './components/SimpleAuthRoute';
@@ -53,6 +54,14 @@ const AnimatedRoutes: React.FC = () => {
         <Route path={RoutePath.TRANSPARENCY} element={<PageWrapper><Transparency /></PageWrapper>} />
         <Route path={RoutePath.GALLERY} element={<PageWrapper><Gallery /></PageWrapper>} />
         <Route path={RoutePath.NEWS} element={<PageWrapper><News /></PageWrapper>} />
+
+        <Route path="/profile" element={
+          <PageWrapper>
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          </PageWrapper>
+        } />
 
         {/* Protected Admin Routes */}
         <Route path={RoutePath.DASHBOARD} element={

@@ -30,6 +30,11 @@ export interface User {
   password?: string; // In a real app, this is hashed. 
   accessCode?: string; // Unique code for ID generation
   transparencyCode?: string; // Unique code for Transparency access
+  photoURL?: string;
+  phoneNumber?: string;
+  grade?: string;
+  indexNumber?: string;
+  position?: string;
 }
 
 export interface FinanceState {

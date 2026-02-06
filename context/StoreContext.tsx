@@ -64,6 +64,7 @@ interface StoreContextType {
   deleteAlbum: (id: string) => void;
   addImageToAlbum: (albumId: string, url: string) => void;
   removeImageFromAlbum: (albumId: string, url: string) => void;
+  updateUserProfile: (data: Partial<User>) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -172,6 +173,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const requestExpense = (amount: number, project: string, desc: string, deadline: string) => { };
   const processRequest = (reqId: string, approved: boolean) => { };
 
+  const updateUserProfile = async (data: Partial<User>) => {
+    if (!currentUser) return;
+    try {
+      const userRef = doc(db, 'users', currentUser.id);
+      await import('firebase/firestore').then(({ setDoc }) => setDoc(userRef, data, { merge: true }));
+
+      // Update local state
+      const updatedUser = { ...currentUser, ...data };
+      setCurrentUser(updatedUser);
+
+      // Update users list if admin
+      setUsers(users.map(u => u.id === currentUser.id ? { ...u, ...data } : u));
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      throw error;
+    }
+  };
+
   const sendNotification = (msg: string, targetId?: string) => {
     const notif: Notification = {
       id: Date.now().toString(),
@@ -231,7 +250,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       access: { idUnlocked, transparencyUnlocked, unlockId, unlockTransparency },
       login, logout, register, createMemberAdmin, deleteUser, updateUserRole, updateCMS,
       addIncome, addTransaction, deleteTransaction, requestExpense, processRequest, sendNotification, addContent, deleteContent,
-      createAlbum, deleteAlbum, addImageToAlbum, removeImageFromAlbum
+      createAlbum, deleteAlbum, addImageToAlbum, removeImageFromAlbum, updateUserProfile
     }}>
       {children}
     </StoreContext.Provider>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, LogOut, CheckCircle, AlertCircle, ShieldCheck, Eye } from 'lucide-react';
+import { Menu, X, LayoutDashboard, LogOut, CheckCircle, AlertCircle, ShieldCheck, Eye, User } from 'lucide-react';
 import { RoutePath } from '../types';
 import { useStore } from '../context/StoreContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -168,28 +168,56 @@ const Navbar: React.FC = () => {
           {/* Auth Actions */}
           <div className="hidden md:flex items-center gap-4">
             {currentUser ? (
-              <div className="flex items-center gap-3">
-                {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'MEMBER_ADMIN') && (
-                  <button
-                    onClick={() => navigate(RoutePath.DASHBOARD)}
-                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-red-700 to-red-900 text-white rounded-full text-sm font-bold border border-red-500/50 shadow-[0_0_15px_rgba(220,38,38,0.5)] hover:scale-105 hover:shadow-[0_0_25px_rgba(220,38,38,0.8)] transition-transform duration-300"
-                  >
-                    <LayoutDashboard className="w-4 h-4" /> Dashboard
-                  </button>
-                )}
-                <div className="flex items-center gap-2 p-1.5 pr-3 bg-gray-100 rounded-full">
-                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-gray-500 text-xs shadow-sm">
-                    {currentUser.name[0]}
-                  </div>
-                  <span className="text-xs font-bold text-gray-600 max-w-[100px] truncate">{currentUser.name}</span>
-                </div>
+              <div className="relative group/profile">
+                {/* Profile Trigger */}
                 <button
-                  onClick={handleLogout}
-                  className={`p-2 rounded-full ${isScrolled ? 'text-gray-600 hover:bg-gray-100' : 'text-white hover:bg-white/10'}`}
-                  title="Logout"
+                  onClick={() => navigate('/profile')}
+                  className="flex items-center gap-3 p-1 pr-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-500 to-red-800 p-[2px]">
+                    <div className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center">
+                      {currentUser.photoURL ? (
+                        <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-bold text-white">{currentUser.name.charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-xs font-bold text-white leading-tight max-w-[80px] truncate">{currentUser.name}</span>
+                    <span className="text-[10px] text-gray-400 leading-tight capitalize">{currentUser.role === "SUPER_ADMIN" ? "Super Admin" : "Member"}</span>
+                  </div>
                 </button>
+
+                {/* Dropdown Menu */}
+                <div className="absolute top-full right-0 mt-2 w-56 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 transform origin-top-right overflow-hidden z-50">
+                  <div className="p-2 flex flex-col gap-1">
+                    <button onClick={() => navigate('/profile')} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-sm font-medium text-gray-200 hover:text-white transition-colors flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400">
+                        <User className="w-4 h-4" /> {/* Lucide User icon needs to be imported if not already, but I saw it imported in Profile.tsx, need to check Navbar imports */}
+                      </div>
+                      My Profile
+                    </button>
+
+                    {(currentUser.role === 'MEMBER_ADMIN' || currentUser.role === 'SUPER_ADMIN') && (
+                      <button onClick={() => navigate(RoutePath.DASHBOARD)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-sm font-medium text-gray-200 hover:text-white transition-colors flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400">
+                          <LayoutDashboard className="w-4 h-4" />
+                        </div>
+                        {currentUser.role === 'SUPER_ADMIN' ? <span className="text-red-400 font-bold">Admin Panel (Super)</span> : "Admin Panel"}
+                      </button>
+                    )}
+
+                    <div className="h-px bg-white/10 my-1 mx-2"></div>
+
+                    <button onClick={handleLogout} className="w-full text-left px-4 py-3 rounded-lg hover:bg-red-900/20 text-sm font-medium text-red-400 hover:text-red-300 transition-colors flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-red-900/20 flex items-center justify-center text-red-500">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      Log Out
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex gap-3">
