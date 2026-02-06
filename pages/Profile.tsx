@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Camera, Save, ArrowLeft } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { storage } from '../utils/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigate } from 'react-router-dom';
 
 const Profile: React.FC = () => {
@@ -22,7 +20,7 @@ const Profile: React.FC = () => {
     });
 
     const [loading, setLoading] = useState(false);
-    const [imageUploading, setImageUploading] = useState(false);
+    const [imageProcessing, setImageProcessing] = useState(false);
 
     useEffect(() => {
         if (currentUser) {
@@ -43,42 +41,77 @@ const Profile: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // Helper: Compress Image to Base64
+    const compressImage = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    const newWidth = MAX_WIDTH;
+                    const newHeight = img.height * scaleSize;
+
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, newWidth, newHeight);
+
+                    // Convert to Base64 JPEG with 0.7 quality
+                    const base64String = canvas.toDataURL('image/jpeg', 0.7);
+                    resolve(base64String);
+                };
+                img.onerror = (err) => reject(err);
+            };
+            reader.onerror = (err) => reject(err);
+        });
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || !e.target.files[0] || !currentUser) return;
+        if (!e.target.files || !e.target.files[0]) return;
 
         const file = e.target.files[0];
-        setImageUploading(true);
+
+        // Validation: Check if it's an image
+        if (!file.type.startsWith('image/')) {
+            alert("Please select a valid image file.");
+            return;
+        }
+
+        setImageProcessing(true);
         try {
-            const storageRef = ref(storage, `profile_images/${currentUser.id}`);
-            await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(storageRef);
+            // Compress and convert to Base64
+            const base64String = await compressImage(file);
 
-            // Immediately update profile to reflect in Navbar
-            await updateUserProfile({ photoURL: downloadURL });
-
-            setFormData(prev => ({ ...prev, photoURL: downloadURL }));
-            alert("Profile Image Updated!");
+            // Allow immediate preview update
+            setFormData(prev => ({ ...prev, photoURL: base64String }));
+            alert("Image processed! Don't forget to click 'Save Changes'.");
         } catch (error) {
-            console.error("Error uploading image:", error);
-            alert("Failed to upload image.");
+            console.error("Error processing image:", error);
+            alert("Failed to process image.");
         } finally {
-            setImageUploading(false);
+            setImageProcessing(false);
         }
     };
 
     const handleSave = async () => {
         setLoading(true);
-        // Console log as requested
         console.log("Form Data Saved:", formData);
 
         try {
-            // 1. Update Firestore (Keep local app state in sync)
+            // 1. Update Firestore (Includes Base64 photoURL now)
             await updateUserProfile({
                 name: formData.name,
                 phoneNumber: formData.phoneNumber,
                 grade: formData.grade,
                 indexNumber: formData.indexNumber,
-                position: formData.position
+                position: formData.position,
+                photoURL: formData.photoURL
             });
 
             // 2. Send to Google Sheets
@@ -92,12 +125,12 @@ const Profile: React.FC = () => {
                 },
                 body: JSON.stringify({
                     name: formData.name,
-                    email: formData.email, // using state which is populated from currentUser
+                    email: formData.email,
                     phone: formData.phoneNumber,
                     grade: formData.grade,
                     indexNo: formData.indexNumber,
                     position: formData.position,
-                    photoURL: formData.photoURL
+                    photoURL: formData.photoURL // Base64 String
                 })
             });
 
@@ -145,7 +178,7 @@ const Profile: React.FC = () => {
                                 ) : (
                                     <User className="w-12 h-12 text-gray-500" />
                                 )}
-                                {imageUploading && (
+                                {imageProcessing && (
                                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                         <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
                                     </div>
@@ -165,7 +198,7 @@ const Profile: React.FC = () => {
                                 accept="image/*"
                             />
                         </div>
-                        <p className="text-sm text-gray-400 text-center">Allowed: JPG, PNG <br /> Max: 5MB</p>
+                        <p className="text-sm text-gray-400 text-center">Allowed: JPG, PNG <br /> Auto-Compressed</p>
                     </div>
 
                     {/* Form Fields */}
