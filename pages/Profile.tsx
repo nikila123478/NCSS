@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { User, Camera, Save, ArrowLeft } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../utils/firebase';
 
 const Profile: React.FC = () => {
     const { currentUser, updateUserProfile } = useStore();
@@ -22,18 +24,31 @@ const Profile: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [imageProcessing, setImageProcessing] = useState(false);
 
+    // FIX 1: Fetch Data on Mount (Persistence)
     useEffect(() => {
-        if (currentUser) {
-            setFormData({
-                name: currentUser.name || '',
-                email: currentUser.email || '',
-                phoneNumber: currentUser.phoneNumber || '',
-                grade: currentUser.grade || '',
-                indexNumber: currentUser.indexNumber || '',
-                position: currentUser.position || '',
-                photoURL: currentUser.photoURL || ''
-            });
-        }
+        const fetchUserData = async () => {
+            if (currentUser?.id) {
+                try {
+                    const userDoc = await getDoc(doc(db, "users", currentUser.id));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        setFormData({
+                            name: data.name || currentUser.name || '',
+                            email: currentUser.email || '', // Email is usually consistent from Auth
+                            phoneNumber: data.phoneNumber || '',
+                            grade: data.grade || '',
+                            indexNumber: data.indexNumber || '',
+                            position: data.position || '',
+                            photoURL: data.photoURL || ''
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error fetching user data:", error);
+                }
+            }
+        };
+
+        fetchUserData();
     }, [currentUser]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -88,8 +103,11 @@ const Profile: React.FC = () => {
             // Compress and convert to Base64
             const base64String = await compressImage(file);
 
-            // Allow immediate preview update
+            // Allow immediate state update for preview
             setFormData(prev => ({ ...prev, photoURL: base64String }));
+
+            // Note: We don't save to Firestore here automatically anymore to ensure consistency. 
+            // User must click "Save Changes" to finalize everything.
             alert("Image processed! Don't forget to click 'Save Changes'.");
         } catch (error) {
             console.error("Error processing image:", error);
@@ -99,12 +117,24 @@ const Profile: React.FC = () => {
         }
     };
 
+    // FIX 2: Robust Save Function
     const handleSave = async () => {
+        if (!currentUser) return;
         setLoading(true);
-        console.log("Form Data Saved:", formData);
 
         try {
-            // 1. Update Firestore (Includes Base64 photoURL now)
+            // 1. Save to Firestore (Merge to keep existing fields)
+            const userRef = doc(db, 'users', currentUser.id);
+            await setDoc(userRef, {
+                name: formData.name,
+                phoneNumber: formData.phoneNumber,
+                grade: formData.grade,
+                indexNumber: formData.indexNumber,
+                position: formData.position,
+                photoURL: formData.photoURL
+            }, { merge: true });
+
+            // Update local Context immediately
             await updateUserProfile({
                 name: formData.name,
                 phoneNumber: formData.phoneNumber,
@@ -114,7 +144,7 @@ const Profile: React.FC = () => {
                 photoURL: formData.photoURL
             });
 
-            // 2. Send to Google Sheets
+            // 2. Send to Google Sheets (Google Apps Script)
             const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzm0bhg2Y88C3LtzeafftRJAVedZFxJPk5fXeo1zVHQmWZi0pPgiH5eRcS7yv-SgCGsUA/exec";
 
             await fetch(GOOGLE_SCRIPT_URL, {
@@ -137,7 +167,7 @@ const Profile: React.FC = () => {
             alert("Profile Saved Successfully!");
         } catch (error) {
             console.error("Error saving profile:", error);
-            alert("Error saving profile");
+            alert("Error saving profile. Please try again.");
         } finally {
             setLoading(false);
         }
